@@ -1,0 +1,201 @@
+// This is your Prisma schema file,
+// learn more about it in the docs: https://pris.ly/d/prisma-schema
+
+// Looking for ways to speed up your queries, or scale easily with your serverless or edge functions?
+// Try Prisma Accelerate: https://pris.ly/cli/accelerate-init
+
+generator client {
+  provider = "prisma-client-js"
+  output   = "../src/generated/prisma"
+}
+
+datasource db {
+  provider = "sqlite"
+  url      = env("DATABASE_URL")
+}
+
+// User model
+model User {
+  id            String    @id @default(cuid())
+  name          String?
+  email         String    @unique
+  emailVerified DateTime?
+  image         String?
+  password      String?
+  createdAt     DateTime  @default(now())
+  updatedAt     DateTime  @updatedAt
+
+  // User statistics and progress
+  stats              UserStats?
+  attempts           QuestionAttempt[]
+  vocabularyProgress VocabularyProgress[]
+
+  // Auth
+  accounts Account[]
+  sessions Session[]
+}
+
+// NextAuth models
+model Account {
+  id                String  @id @default(cuid())
+  userId            String
+  type              String
+  provider          String
+  providerAccountId String
+  refresh_token     String?
+  access_token      String?
+  expires_at        Int?
+  token_type        String?
+  scope             String?
+  id_token          String?
+  session_state     String?
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([provider, providerAccountId])
+}
+
+model Session {
+  id           String   @id @default(cuid())
+  sessionToken String   @unique
+  userId       String
+  expires      DateTime
+  user         User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+}
+
+model VerificationToken {
+  identifier String
+  token      String   @unique
+  expires    DateTime
+
+  @@unique([identifier, token])
+}
+
+// GMAT and GRE questions
+model Question {
+  id          String     @id @default(cuid())
+  examType    ExamType
+  section     Section
+  difficulty  Difficulty
+  content     String
+  options     Json? // For multiple choice questions
+  solution    String
+  explanation String
+  imageUrl    String?
+  createdAt   DateTime   @default(now())
+  updatedAt   DateTime   @updatedAt
+
+  // Relations
+  attempts QuestionAttempt[]
+}
+
+// Track user attempts at questions
+model QuestionAttempt {
+  id         String    @id @default(cuid())
+  userId     String
+  questionId String
+  userAnswer String
+  isCorrect  Boolean
+  timeTaken  Int // in seconds
+  mode       StudyMode
+  createdAt  DateTime  @default(now())
+
+  // Relations
+  user     User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  question Question @relation(fields: [questionId], references: [id], onDelete: Cascade)
+}
+
+// User statistics across exams
+model UserStats {
+  id                      String    @id @default(cuid())
+  userId                  String    @unique
+  totalQuestionsAttempted Int       @default(0)
+  correctAnswers          Int       @default(0)
+  gmatScore               Int?
+  greScore                Int?
+  studyTimeMinutes        Int       @default(0)
+  streakDays              Int       @default(0)
+  lastStudyDate           DateTime?
+
+  // Relations
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+}
+
+// Vocabulary section
+model VocabularyWord {
+  id           String     @id @default(cuid())
+  word         String     @unique
+  definition   String
+  example      String
+  difficulty   Difficulty
+  mastered     Boolean    @default(false)
+  createdAt    DateTime   @default(now())
+  updatedAt    DateTime   @updatedAt
+
+  // Relations
+  progress VocabularyProgress[]
+}
+
+// Track vocabulary progress
+model VocabularyProgress {
+  id           String       @id @default(cuid())
+  userId       String
+  wordId       String
+  mastery      MasteryLevel
+  lastReviewed DateTime
+  nextReview   DateTime
+
+  // Relations
+  user User           @relation(fields: [userId], references: [id], onDelete: Cascade)
+  word VocabularyWord @relation(fields: [wordId], references: [id], onDelete: Cascade)
+
+  @@unique([userId, wordId])
+}
+
+// Inspirational quotes for the app
+model Quote {
+  id        String        @id @default(cuid())
+  content   String
+  author    String
+  category  QuoteCategory
+  createdAt DateTime      @default(now())
+}
+
+// Enums
+enum ExamType {
+  GMAT
+  GRE
+}
+
+enum Section {
+  VERBAL
+  QUANTITATIVE
+  INTEGRATED_REASONING
+  ANALYTICAL_WRITING
+}
+
+enum Difficulty {
+  EASY
+  MEDIUM
+  HARD
+}
+
+enum StudyMode {
+  EXAM
+  PRACTICE
+  REVIEW
+}
+
+enum MasteryLevel {
+  NEW
+  LEARNING
+  REVIEWING
+  MASTERED
+}
+
+enum QuoteCategory {
+  MOTIVATION
+  SUCCESS
+  LEARNING
+  PERSEVERANCE
+}
